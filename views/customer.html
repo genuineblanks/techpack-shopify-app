@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My TechPacks - Customer Portal</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f6f6f7;
+            color: #202223;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .header h1 {
+            margin-bottom: 10px;
+            color: #202223;
+        }
+        .actions {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #008060;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #007552;
+        }
+        .techpack-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        .techpack-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .techpack-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .card-header {
+            margin-bottom: 15px;
+        }
+        .card-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .card-meta {
+            font-size: 0.9em;
+            color: #6d7175;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+        .status-draft { background: #f3f4f6; color: #374151; }
+        .status-submitted { background: #dbeafe; color: #1e40af; }
+        .status-under-review { background: #fef3c7; color: #92400e; }
+        .status-quoted { background: #d1fae5; color: #065f46; }
+        .status-completed { background: #dcfce7; color: #166534; }
+        .card-details {
+            margin: 15px 0;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        .detail-label {
+            color: #6d7175;
+        }
+        .detail-value {
+            font-weight: 500;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: #6d7175;
+        }
+        .empty-state p {
+            color: #9ca3af;
+            margin-bottom: 30px;
+        }
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: #6d7175;
+        }
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            .techpack-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>My TechPacks</h1>
+            <p>Track the progress of your garment submissions and manage your orders</p>
+        </div>
+
+        <div class="actions">
+            <button class="btn" onclick="createNewTechPack()">Submit New TechPack</button>
+        </div>
+
+        <div id="techpack-container">
+            <div class="loading">Loading your TechPacks...</div>
+        </div>
+    </div>
+
+    <script>
+        // Get shop and customer from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const shop = urlParams.get('shop') || 'demo.myshopify.com';
+        const customerId = urlParams.get('customer_id');
+
+        async function loadTechPacks() {
+            try {
+                let url = `/api/techpacks?shop=${shop}`;
+                if (customerId) {
+                    url += `&customer_id=${customerId}`;
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success) {
+                    renderTechPacks(data.techpacks);
+                } else {
+                    showError('Failed to load TechPacks');
+                }
+            } catch (error) {
+                console.error('Error loading TechPacks:', error);
+                showError('Unable to connect to the server');
+            }
+        }
+
+        function renderTechPacks(techpacks) {
+            const container = document.getElementById('techpack-container');
+
+            if (techpacks.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>No TechPacks Yet</h3>
+                        <p>You haven't submitted any TechPacks yet. Get started by creating your     
+ first submission!</p>
+                        <button class="btn" onclick="createNewTechPack()">Submit Your First
+TechPack</button>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = techpacks.map(techpack => `
+                <div class="techpack-card">
+                    <div class="card-header">
+                        <div
+class="card-title">${formatSubmissionType(techpack.submission_type)}</div>
+                        <div class="card-meta">
+                            Submitted ${techpack.submitted_at ?
+formatDate(techpack.submitted_at) : 'Draft'}
+                        </div>
+                        <span class="status-badge
+status-${techpack.status}">${formatStatus(techpack.status)}</span>
+                    </div>
+
+                    <div class="card-details">
+                        <div class="detail-row">
+                            <span class="detail-label">Company:</span>
+                            <span class="detail-value">${techpack.client_info.companyName ||
+'N/A'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Production Type:</span>
+                            <span
+class="detail-value">${formatProductionType(techpack.production_type)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Total Quantity:</span>
+                            <span class="detail-value">${techpack.total_quantity || 0}</span>        
+                        </div>
+                        ${techpack.quoted_price ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Quoted Price:</span>
+                            <span class="detail-value">$${techpack.quoted_price}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = `<div class="techpack-grid">${html}</div>`;
+        }
+
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        function formatStatus(status) {
+            return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function formatSubmissionType(type) {
+            const types = {
+                'quotation': 'Quotation Request',
+                'sample-request': 'Sample Request',
+                'bulk-order-request': 'Bulk Order Request',
+                'lab-dips-accessories': 'Lab Dips & Accessories'
+            };
+            return types[type] || type;
+        }
+
+        function formatProductionType(type) {
+            return type === 'custom-production' ? 'Custom Production' : 'Our Blanks';
+        }
+
+        function showError(message) {
+            document.getElementById('techpack-container').innerHTML = `
+                <div style="background: #fee2e2; border: 1px solid #fecaca; color: #dc2626;
+padding: 15px; border-radius: 4px; text-align: center;">
+                    ${message}
+                </div>
+            `;
+        }
+
+        function createNewTechPack() {
+            // Redirect to the main theme TechPack page
+            window.open(`https://${shop.replace('.myshopify.com', '')}.com/pages/techpack`,
+'_blank');
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', loadTechPacks);
+    </script>
+</body>
+</html>
